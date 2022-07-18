@@ -5,6 +5,29 @@
 import EventEmitter from "events";
 import { makeMessage, parseMessage, SignalingMessage } from "./message";
 import { WebRTCRequest } from "./request";
+import { detectStreamEnding } from "./stream-util";
+
+export declare interface WebRTCClient {
+    /**
+     * Event triggered when connection is established
+     */
+    addEventListener(event: 'open', listener: () => void): this;
+
+    /**
+     * Event triggered when connection is closed
+     */
+    addEventListener(event: 'close', listener: (ev: CloseEvent) => void): this;
+
+    /**
+     * Event triggered when error occurs
+     */
+    addEventListener(event: 'error', listener: (error: Error) => void): this;
+
+    /**
+     * Event triggered when message is received
+     */
+    addEventListener(event: 'message', listener: (msg: SignalingMessage) => void): this;
+}
 
 /**
  * WebRTC CDN Client
@@ -30,6 +53,9 @@ export class WebRTCClient extends EventEmitter {
         this.connect();
     }
 
+    /**
+     * Connects to WebRTC CDN
+     */
     public connect() {
         if (this.ws) {
             return; // Already connected
@@ -41,12 +67,19 @@ export class WebRTCClient extends EventEmitter {
         this.ws.onmessage = this.onMessage.bind(this);
     }
 
+    /**
+     * Closes the connection
+     */
     public close() {
         if (this.ws) {
             this.ws.close();
         }
     }
 
+    /**
+     * Sends a message
+     * @param msg The message to send
+     */
     public send(msg: SignalingMessage) {
         this.emit("send", msg);
         if (this.ws) {
@@ -54,8 +87,40 @@ export class WebRTCClient extends EventEmitter {
         }
     }
 
+    /**
+     * Starts a PLAY request
+     * @param requestID Request ID
+     * @param streamId Stream ID
+     * @param authToken Auth token
+     * @returns The request
+     */
+    public play(requestID: string, streamId: string, authToken?: string): WebRTCRequest {
+        const req = new WebRTCRequest(this, requestID, "PLAY", null, streamId, authToken || "");
+        req.start();
+        return req;
+    }
+
+    /**
+     * Starts a PUBLISH request
+     * @param requestID Request ID
+     * @param stream Media stream
+     * @param streamId Stream ID
+     * @param authToken Auth token
+     * @returns The request
+     */
+    public publish(requestID: string, stream: MediaStream, streamId: string, authToken?: string): WebRTCRequest {
+        const req = new WebRTCRequest(this, requestID, "PUBLISH", stream, streamId, authToken || "");
+        detectStreamEnding(stream, () => {
+            req.close();
+        });
+        req.start();
+        return req;
+    }
+
+    /* Private methods */
+
     private onOpen() {
-        this.emit("connect");
+        this.emit("open");
     }
 
     private onClose(ev: CloseEvent) {

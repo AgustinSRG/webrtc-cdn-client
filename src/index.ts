@@ -6,3 +6,4 @@
 export * from './client';
 export * from './request';
 export * from './message';
+export * from './stream-util';
