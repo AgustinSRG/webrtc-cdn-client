@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC CDN test client</title>
+    <style>
+        *,
+        ::after,
+        ::before {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0.5rem;
+            width: 100%;
+        }
+
+        .form-group {
+            padding-bottom: 0.75rem;
+        }
+
+        .text-input {
+            display: block;
+            width: 100%;
+            padding: 0.25rem;
+            margin: 0;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            padding-bottom: 0.25rem;
+        }
+
+        #test_video {
+            background-color: black;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            font-size: large;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .error-msg {
+            color: red;
+        }
+    </style>
+    <script type="text/javascript" src="../dist.webpack/webrtc-cdn-client.js"></script>
+</head>
+
+<body>
+    <h2>WebRTC CDN test client</h2>
+    <div class="test-form">
+        <div class="form-group">
+            <label>Stream ID:</label>
+            <input id="test_stream_id" type="text" autocomplete="off" maxlength="255" class="text-input" value="test">
+        </div>
+        <div class="form-group">
+            <label>Authorization token:</label>
+            <input id="test_auth" type="text" autocomplete="off" class="text-input">
+        </div>
+        <div class="form-group">
+            <label>RTCPeerConnection configuration:</label>
+            <textarea id="test_config" class="text-input">
+{
+    "iceServers": [
+        { "urls": "stun:stun.l.google.com:19302" }
+    ],
+    "sdpSemantics": "unified-plan"
+}
+            </textarea>
+        </div>
+        <div class="form-group">
+            <div id="test_error" class="error-msg"></div>
+            <button id="publish_button" type="button">Publish (Camera)</button>
+            <button id="publish_screen_button" type="button">Publish (Screen)</button>
+            <button id="watch_button" type="button">Watch</button>
+            <button id="stop_button" type="button" disabled>Stop</button>
+        </div>
+    </div>
+    <div class="video-container">
+        <div id="test_status" class="form-group">Status: Disconnected</div>
+        <video id="test_video"></video>
+    </div>
+    <script>
+        var streamID = "";
+        var authToken = "";
+        var rtcConfig = {};
+
+        var requestId = Date.now() + "";
+
+        var client = null;
+        var req = null;
+
+        function loadFromForm() {
+            streamID = document.getElementById("test_stream_id").value;
+            authToken = document.getElementById("test_auth").value;
+
+            try {
+                rtcConfig = JSON.parse(document.getElementById("test_config").value);
+            } catch (ex) {
+                console.error(ex);
+                rtcConfig = {};
+            }
+        }
+
+        function escapeHTML(html) {
+            return ("" + html).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+                .replace(/'/g, "&apos;");
+        };
+
+        function changeStatus(status) {
+            document.getElementById("test_status").innerHTML = escapeHTML(status);
+        }
+
+        function disableForm() {
+            document.getElementById("test_stream_id").disabled = true;
+            document.getElementById("test_auth").disabled = true;
+            document.getElementById("publish_button").disabled = true;
+            document.getElementById("publish_screen_button").disabled = true;
+            document.getElementById("watch_button").disabled = true;
+            document.getElementById("stop_button").disabled = false;
+        }
+
+        function enableForm() {
+            document.getElementById("test_stream_id").disabled = false;
+            document.getElementById("test_auth").disabled = false;
+            document.getElementById("publish_button").disabled = false;
+            document.getElementById("publish_screen_button").disabled = false;
+            document.getElementById("watch_button").disabled = false;
+            document.getElementById("stop_button").disabled = true;
+        }
+
+        function getMedia(reqFunc, callback) {
+            var options = {
+                audio: true,
+                video: true,
+            };
+            // First we try both
+            reqFunc(options, function (stream) {
+                callback(stream);
+            }, function (err) {
+                console.error(err);
+                if (err.name === "NotAllowedError") {
+                    return callback(null, err.message);
+                }
+                // Now we try only audio
+                options = {
+                    audio: true,
+                    video: false,
+                };
+                reqFunc(options, function (stream) {
+                    callback(stream);
+                }, function (err2) {
+                    console.error(err2);
+                    if (err2.name === "NotAllowedError") {
+                        return callback(null, err2.message);
+                    }
+                    // Now we try only video
+                    options = {
+                        audio: false,
+                        video: true,
+                    };
+                    reqFunc(options, function (stream) {
+                        callback(stream);
+                    }, function (err3) {
+                        console.error(err3);
+                        // No way to get the stream
+                        return callback(null, err3.message);
+                    });
+                });
+            });
+        }
+
+        // watch
+
+        function watchStream() {
+            if (!streamID) {
+                alert("Plaese type a valid stream ID");
+                stopClient();
+                enableForm();
+                return;
+            }
+
+            changeStatus("Status: Connecting...");
+            client = new WebRTC_CDN.WebRTCClient("ws://localhost/ws", rtcConfig);
+
+            client.on('open', function () {
+                changeStatus("Status: Connected. Pulling stream...");
+
+                req = client.play(requestId, streamID, authToken);
+
+                req.on('ok', function () {
+                    changeStatus("Status: Connected");
+                });
+
+                req.on('standby', function () {
+                    document.getElementById("test_video").pause();
+                    document.getElementById("test_video").srcObject = null;
+                });
+
+                req.on('stream', function (stream) {
+                    if (mediaStream) {
+                        try {
+                            mediaStream.stop();
+                        } catch (ex) { }
+                        try {
+                            mediaStream.getTracks().forEach(function (track) {
+                                track.stop();
+                            });
+                        } catch (ex) { }
+                    }
+
+                    mediaStream = stream;
+
+                    document.getElementById("test_video").muted = false;
+                    document.getElementById("test_video").srcObject = mediaStream;
+                    document.getElementById("test_video").play();
+                });
+
+                req.on('close', function () {
+                    stopClient();
+                    enableForm();
+                });
+
+                req.on('peer-connection-state-change', function (state) {
+                    console.log("PC: " + state);
+                });
+
+                req.on('error', function (e) {
+                    stopClient();
+                    enableForm();
+                    alert("Error: " + e.code + " / " + e.message);
+                });
+            });
+
+            client.on('close', function () {
+                client = null;
+                stopClient();
+                enableForm();
+            });
+
+            client.on('error', function (e) {
+                console.error(e);
+            });
+
+            client.on('send', function (m) {
+                console.log(">>> " + JSON.stringify(m));
+            });
+
+            client.on('message', function (m) {
+                console.log("<<< " + JSON.stringify(m));
+            });
+        }
+
+        // Publish
+
+        function publishStream() {
+            if (!streamID) {
+                alert("Plaese type a valid stream ID");
+                stopClient();
+                enableForm();
+                return;
+            }
+
+            document.getElementById("test_video").muted = true;
+            document.getElementById("test_video").srcObject = mediaStream;
+            document.getElementById("test_video").play();
+
+            changeStatus("Status: Connecting...");
+            client = new WebRTC_CDN.WebRTCClient("ws://localhost/ws", rtcConfig);
+
+            client.on('open', function () {
+                changeStatus("Status: Connected. Publishing stream...");
+
+                req = client.publish(requestId, mediaStream, streamID, authToken);
+
+                req.on('ok', function () {
+                    changeStatus("Status: Connected");
+                });
+
+                req.on('close', function () {
+                    stopClient();
+                    enableForm();
+                });
+
+                req.on('peer-connection-state-change', function (state) {
+                    console.log("PC: " + state);
+                });
+
+                req.on('error', function (e) {
+                    stopClient();
+                    enableForm();
+                    alert("Error: " + e.code + " / " + e.message);
+                });
+            });
+
+            client.on('close', function () {
+                client = null;
+                stopClient();
+                enableForm();
+            });
+
+            client.on('error', function (e) {
+                console.error(e);
+            });
+
+            client.on('send', function (m) {
+                console.log(">>> " + JSON.stringify(m));
+            });
+
+            client.on('message', function (m) {
+                console.log("<<< " + JSON.stringify(m));
+            });
+        }
+
+        // STOP
+
+        function stopClient() {
+            if (client) {
+                client.close();
+                client = null;
+            }
+            if (mediaStream) {
+                try {
+                    mediaStream.stop();
+                } catch (ex) { }
+                try {
+                    mediaStream.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+                } catch (ex) { }
+            }
+            changeStatus("Status: Disconnected");
+            document.getElementById("test_video").pause();
+            document.getElementById("test_video").srcObject = null;
+        }
+
+        // ACTIONS
+
+        document.getElementById("publish_button").addEventListener("click", function () {
+            disableForm();
+            loadFromForm();
+
+            var reqFunc = function (options, callback, errCallback) {
+                try {
+                    navigator.mediaDevices.getUserMedia(options)
+                        .then(callback)
+                        .catch(errCallback);
+                } catch (ex) {
+                    try {
+                        navigator.getUserMedia(options)
+                            .then(callback)
+                            .catch(errCallback);
+                    } catch (ex2) {
+                        errCallback(ex2);
+                    }
+                }
+            };
+
+            getMedia(reqFunc, function (stream) {
+                if (!stream) {
+                    enableForm();
+                    return;
+                }
+
+                mediaStream = stream;
+
+                publishStream();
+            });
+        });
+
+        document.getElementById("publish_screen_button").addEventListener("click", function () {
+            disableForm();
+            loadFromForm();
+
+            var reqFunc = function (options, callback, errCallback) {
+                try {
+                    navigator.mediaDevices.getDisplayMedia(options)
+                        .then(callback)
+                        .catch(errCallback);
+                } catch (ex) {
+                    errCallback(ex);
+                }
+            };
+
+            getMedia(reqFunc, function (stream) {
+                if (!stream) {
+                    enableForm();
+                    return;
+                }
+
+                mediaStream = stream;
+
+                publishStream();
+            });
+        });
+
+        document.getElementById("watch_button").addEventListener("click", function () {
+            disableForm();
+            loadFromForm();
+
+            if (!streamID) {
+                enableForm();
+                return;
+            }
+
+            mediaStream = null;
+
+            watchStream();
+        });
+
+        document.getElementById("stop_button").addEventListener("click", function () {
+            stopClient()
+            enableForm();
+        });
+    </script>
+</body>
+
+</html>

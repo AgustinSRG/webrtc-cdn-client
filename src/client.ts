@@ -11,22 +11,22 @@ export declare interface WebRTCClient {
     /**
      * Event triggered when connection is established
      */
-    addEventListener(event: 'open', listener: () => void): this;
+     on(event: 'open', listener: () => void): this;
 
     /**
      * Event triggered when connection is closed
      */
-    addEventListener(event: 'close', listener: (ev: CloseEvent) => void): this;
+     on(event: 'close', listener: (ev: CloseEvent) => void): this;
 
     /**
      * Event triggered when error occurs
      */
-    addEventListener(event: 'error', listener: (error: Error) => void): this;
+     on(event: 'error', listener: (error: Error) => void): this;
 
     /**
      * Event triggered when message is received
      */
-    addEventListener(event: 'message', listener: (msg: SignalingMessage) => void): this;
+    on(event: 'message', listener: (msg: SignalingMessage) => void): this;
 }
 
 /**
@@ -97,7 +97,11 @@ export class WebRTCClient extends EventEmitter {
      * @returns The request
      */
     public play(requestID: string, streamId: string, authToken?: string): WebRTCRequest {
+        if (this.requests.has(requestID)) {
+            throw new Error("There is another active request with the same ID");
+        }
         const req = new WebRTCRequest(this, requestID, "PLAY", null, streamId, authToken || "");
+        this.requests.set(requestID, req);
         req.start();
         return req;
     }
@@ -111,7 +115,11 @@ export class WebRTCClient extends EventEmitter {
      * @returns The request
      */
     public publish(requestID: string, stream: MediaStream, streamId: string, authToken?: string): WebRTCRequest {
+        if (this.requests.has(requestID)) {
+            throw new Error("There is another active request with the same ID");
+        }
         const req = new WebRTCRequest(this, requestID, "PUBLISH", stream, streamId, authToken || "");
+        this.requests.set(requestID, req);
         detectStreamEnding(stream, () => {
             req.close();
         });
@@ -151,7 +159,7 @@ export class WebRTCClient extends EventEmitter {
         const msg = parseMessage("" + ev.data);
         this.emit("message", msg);
 
-        const requestID = msg.args['Request-ID'] + "";
+        const requestID = msg.args['request-id'] + "";
         const request = this.requests.get(requestID);
 
         switch (msg.type) {
@@ -162,7 +170,7 @@ export class WebRTCClient extends EventEmitter {
             break;
         case "ERROR":
             if (request) {
-                request.onError(msg.args['Error-Code'], msg.args['Error-Message']);
+                request.onError(msg.args['error-code'], msg.args['error-message']);
                 request.onClose();
                 this.requests.delete(requestID);
             }

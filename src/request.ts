@@ -10,37 +10,37 @@ export declare interface WebRTCRequest {
     /**
      * Event triggered when OK message is received
      */
-    addEventListener(event: 'ok', listener: () => void): this;
+    on(event: 'ok', listener: () => void): this;
 
     /**
      * Event triggered when OK message is received
      */
-    addEventListener(event: 'standby', listener: () => void): this;
+    on(event: 'standby', listener: () => void): this;
 
     /**
      * Event triggered for PLAY requests, when OFFER is received
      */
-    addEventListener(event: 'stream', listener: (stream: MediaStream) => void): this;
+    on(event: 'stream', listener: (stream: MediaStream) => void): this;
 
     /**
      * Event triggered for PLAY requests, when a track is received
      */
-    addEventListener(event: 'track', listener: (track: MediaStreamTrack) => void): this;
+    on(event: 'track', listener: (track: MediaStreamTrack) => void): this;
 
     /**
      * Event triggered when the request is closed
      */
-    addEventListener(event: 'close', listener: () => void): this;
+    on(event: 'close', listener: () => void): this;
 
     /**
      * Event triggered when ERROR message is received
      */
-    addEventListener(event: 'error', listener: (error: { code: string, message: string }) => void): this;
+    on(event: 'error', listener: (error: { code: string, message: string }) => void): this;
 
     /**
      * Event triggered when peer connection states changes
      */
-    addEventListener(event: 'peer-connection-state-change', listener: (state: RTCPeerConnectionState) => void): this;
+    on(event: 'peer-connection-state-change', listener: (state: RTCPeerConnectionState) => void): this;
 }
 
 /**
