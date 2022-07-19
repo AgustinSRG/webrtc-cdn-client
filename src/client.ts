@@ -40,6 +40,8 @@ export class WebRTCClient extends EventEmitter {
 
     public requests: Map<string, WebRTCRequest>;
 
+    private heartbeatInterval: NodeJS.Timeout;
+
     /**
      * @param url Websocket url
      * @param config WebRTc configuration
@@ -120,10 +122,19 @@ export class WebRTCClient extends EventEmitter {
     /* Private methods */
 
     private onOpen() {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
+        this.heartbeatInterval = setInterval(this.sendHeartBeat.bind(this), 20000);
         this.emit("open");
     }
 
     private onClose(ev: CloseEvent) {
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+            this.heartbeatInterval = null;
+        }
         this.ws = null;
         this.requests.forEach(r => {
             r.onClose();
@@ -178,5 +189,13 @@ export class WebRTCClient extends EventEmitter {
             }
             break;
         }
+    }
+
+    private sendHeartBeat() {
+        this.send({
+            type: "HEARTBEAT",
+            args: {},
+            body: "",
+        });
     }
 }
