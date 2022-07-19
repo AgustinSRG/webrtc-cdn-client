@@ -11,17 +11,17 @@ export declare interface WebRTCClient {
     /**
      * Event triggered when connection is established
      */
-     on(event: 'open', listener: () => void): this;
+    on(event: 'open', listener: () => void): this;
 
     /**
      * Event triggered when connection is closed
      */
-     on(event: 'close', listener: (ev: CloseEvent) => void): this;
+    on(event: 'close', listener: (ev: CloseEvent) => void): this;
 
     /**
      * Event triggered when error occurs
      */
-     on(event: 'error', listener: (error: Error) => void): this;
+    on(event: 'error', listener: (error: Error) => void): this;
 
     /**
      * Event triggered when message is received
@@ -42,6 +42,8 @@ export class WebRTCClient extends EventEmitter {
 
     private heartbeatInterval: NodeJS.Timeout;
 
+    private nextRequestID: number;
+
     /**
      * @param url Websocket url
      * @param config WebRTc configuration
@@ -52,6 +54,7 @@ export class WebRTCClient extends EventEmitter {
         this.ws = null;
         this.config = config;
         this.requests = new Map();
+        this.nextRequestID = 0;
         this.connect();
     }
 
@@ -91,15 +94,12 @@ export class WebRTCClient extends EventEmitter {
 
     /**
      * Starts a PLAY request
-     * @param requestID Request ID
      * @param streamId Stream ID
      * @param authToken Auth token
      * @returns The request
      */
-    public play(requestID: string, streamId: string, authToken?: string): WebRTCRequest {
-        if (this.requests.has(requestID)) {
-            throw new Error("There is another active request with the same ID");
-        }
+    public play(streamId: string, authToken?: string): WebRTCRequest {
+        const requestID = this.getRequestID();
         const req = new WebRTCRequest(this, requestID, "PLAY", null, streamId, authToken || "");
         this.requests.set(requestID, req);
         req.start();
@@ -108,16 +108,13 @@ export class WebRTCClient extends EventEmitter {
 
     /**
      * Starts a PUBLISH request
-     * @param requestID Request ID
      * @param stream Media stream
      * @param streamId Stream ID
      * @param authToken Auth token
      * @returns The request
      */
-    public publish(requestID: string, stream: MediaStream, streamId: string, authToken?: string): WebRTCRequest {
-        if (this.requests.has(requestID)) {
-            throw new Error("There is another active request with the same ID");
-        }
+    public publish(stream: MediaStream, streamId: string, authToken?: string): WebRTCRequest {
+        const requestID = this.getRequestID();
         const req = new WebRTCRequest(this, requestID, "PUBLISH", stream, streamId, authToken || "");
         this.requests.set(requestID, req);
         detectStreamEnding(stream, () => {
@@ -128,6 +125,12 @@ export class WebRTCClient extends EventEmitter {
     }
 
     /* Private methods */
+
+    private getRequestID(): string {
+        const id = "r" + this.nextRequestID;
+        this.nextRequestID++;
+        return id;
+    }
 
     private onOpen() {
         if (this.heartbeatInterval) {

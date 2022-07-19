@@ -93,8 +93,6 @@
         var authToken = "";
         var rtcConfig = {};
 
-        var requestId = Date.now() + "";
-
         var client = null;
         var req = null;
 
@@ -195,7 +193,7 @@
             client.on('open', function () {
                 changeStatus("Status: Connected. Pulling stream...");
 
-                req = client.play(requestId, streamID, authToken);
+                req = client.play(streamID, authToken);
 
                 req.on('ok', function () {
                     changeStatus("Status: Connected");
@@ -280,7 +278,7 @@
             client.on('open', function () {
                 changeStatus("Status: Connected. Publishing stream...");
 
-                req = client.publish(requestId, mediaStream, streamID, authToken);
+                req = client.publish(mediaStream, streamID, authToken);
 
                 req.on('ok', function () {
                     changeStatus("Status: Connected");
