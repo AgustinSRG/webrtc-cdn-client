@@ -51,12 +51,16 @@
             color: red;
         }
     </style>
-    <script type="text/javascript" src="../dist.webpack/webrtc-cdn-client.js"></script>
+    <script type="text/javascript" src="/js/webrtc-cdn-client.js"></script>
 </head>
 
 <body>
     <h2>WebRTC CDN test client</h2>
     <div class="test-form">
+        <div class="form-group">
+            <label>Websocket URL:</label>
+            <input id="test_ws_url" type="text" autocomplete="off" maxlength="255" class="text-input" value="ws://localhost/ws">
+        </div>
         <div class="form-group">
             <label>Stream ID:</label>
             <input id="test_stream_id" type="text" autocomplete="off" maxlength="255" class="text-input" value="test">
@@ -119,6 +123,7 @@
         }
 
         function disableForm() {
+            document.getElementById("test_ws_url").disabled = true;
             document.getElementById("test_stream_id").disabled = true;
             document.getElementById("test_auth").disabled = true;
             document.getElementById("publish_button").disabled = true;
@@ -128,6 +133,7 @@
         }
 
         function enableForm() {
+            document.getElementById("test_ws_url").disabled = false;
             document.getElementById("test_stream_id").disabled = false;
             document.getElementById("test_auth").disabled = false;
             document.getElementById("publish_button").disabled = false;
@@ -188,7 +194,8 @@
             }
 
             changeStatus("Status: Connecting...");
-            client = new WebRTC_CDN.WebRTCClient("ws://localhost/ws", rtcConfig);
+
+            client = new WebRTC_CDN.WebRTCClient(document.getElementById("test_ws_url").value || "ws://localhost/ws", rtcConfig);
 
             client.on('open', function () {
                 changeStatus("Status: Connected. Pulling stream...");
