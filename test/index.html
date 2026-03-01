@@ -59,7 +59,7 @@
     <div class="test-form">
         <div class="form-group">
             <label>Websocket URL:</label>
-            <input id="test_ws_url" type="text" autocomplete="off" maxlength="255" class="text-input" value="ws://localhost/ws">
+            <input id="test_ws_url" type="text" autocomplete="off" maxlength="255" class="text-input" value="ws://localhost:8000/ws">
         </div>
         <div class="form-group">
             <label>Stream ID:</label>
@@ -280,7 +280,7 @@
             document.getElementById("test_video").play();
 
             changeStatus("Status: Connecting...");
-            client = new WebRTC_CDN.WebRTCClient("ws://localhost/ws", rtcConfig);
+            client = new WebRTC_CDN.WebRTCClient(document.getElementById("test_ws_url").value || "ws://localhost/ws", rtcConfig);
 
             client.on('open', function () {
                 changeStatus("Status: Connected. Publishing stream...");
